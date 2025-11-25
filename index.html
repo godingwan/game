@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Game</title>
+    <title>Khloe's Secret</title>
     <style>
         body {
             background-color: #202028;
@@ -132,13 +132,13 @@
         }
         #btn-a:active { box-shadow: 0 0 0; transform: translateY(4px); }
 
-        .instructions { color: #aaa; font-size: 12px; margin-bottom: 5px; text-align: center; }
+        .instructions { color: #aaa; font-size: 14px; margin-bottom: 10px; text-align: center; font-weight: bold;}
 
     </style>
 </head>
 <body>
 
-    <div class="instructions">Use Arrows to Move • Press 'A' to Interact</div>
+    <div class="instructions">Desktop: Use ARROW KEYS to Move • Press 'A' to Interact</div>
 
     <div id="game-wrapper">
         <div id="game-container">
@@ -179,18 +179,12 @@
     const player = { x: 5 * TILE, y: 5 * TILE, speed: 4, dir: 'down', color: '#ff4081' }; 
     
     // --- STORY STATE ---
-    // 0 = Needs to find Mirror ("I'M")
-    // 1 = Needs to find Bear ("BIG")
-    // 2 = Needs to find Gift ("SISTER")
     let storyProgress = 0; 
     let isTalking = false;
 
-    // Objects
-    // ID: Used for logic
-    // Symbol: The emoji drawn on the map
     const objects = [
         { id: 'mirror', x: 2, y: 2, w: 1, h: 1, color: '#81d4fa', symbol: '🪞' },
-        { id: 'bear',   x: 7, y: 3, w: 2, h: 2, color: '#795548', symbol: '🧸' }, // Bigger object
+        { id: 'bear',   x: 7, y: 3, w: 2, h: 2, color: '#795548', symbol: '🧸' },
         { id: 'gift',   x: 4, y: 7, w: 1, h: 1, color: '#ffd54f', symbol: '🎁' }
     ];
 
@@ -198,11 +192,18 @@
 
     // --- INPUTS ---
     window.addEventListener('keydown', (e) => {
+        // Track key state
         keys[e.key] = true;
-        if (e.key === ' ' || e.key === 'Enter') interact();
+        
+        // INTERACTION: Only trigger on 'a' or 'A'
+        if (e.key === 'a' || e.key === 'A') {
+            interact();
+        }
     });
+    
     window.addEventListener('keyup', (e) => keys[e.key] = false);
 
+    // Mobile Touch Mapping
     const addTouch = (elem, key) => {
         elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
         elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
@@ -217,6 +218,8 @@
         if(isTalking) closeDialog(); 
         else interact(); 
     });
+    
+    // Click dialog to advance
     dialogBox.addEventListener('click', closeDialog);
 
     // --- ENGINE ---
@@ -224,10 +227,24 @@
         if (isTalking) return;
 
         let dx = 0, dy = 0;
-        if (keys['ArrowUp'] || keys['w']) { dy = -player.speed; player.dir = 'up'; }
-        else if (keys['ArrowDown'] || keys['s']) { dy = player.speed; player.dir = 'down'; }
-        else if (keys['ArrowLeft'] || keys['a']) { dx = -player.speed; player.dir = 'left'; }
-        else if (keys['ArrowRight'] || keys['d']) { dx = player.speed; player.dir = 'right'; }
+        
+        // MOVEMENT: STRICTLY ARROW KEYS ONLY
+        if (keys['ArrowUp']) { 
+            dy = -player.speed; 
+            player.dir = 'up'; 
+        }
+        else if (keys['ArrowDown']) { 
+            dy = player.speed; 
+            player.dir = 'down'; 
+        }
+        else if (keys['ArrowLeft']) { 
+            dx = -player.speed; 
+            player.dir = 'left'; 
+        }
+        else if (keys['ArrowRight']) { 
+            dx = player.speed; 
+            player.dir = 'right'; 
+        }
 
         // Move & Collide with Walls
         let nextX = player.x + dx;
@@ -266,7 +283,6 @@
             ctx.fillStyle = '#000';
             ctx.font = '24px Arial';
             ctx.textAlign = 'center';
-            // Center the emoji
             const cx = (obj.x * TILE) + (obj.w * TILE) / 2;
             const cy = (obj.y * TILE) + (obj.h * TILE) / 1.5;
             ctx.fillText(obj.symbol, cx, cy);
