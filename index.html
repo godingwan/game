@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game</title>
+    <style>
+        body {
+            background-color: #202028;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+        }
+
+        #game-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            background-color: #fce4ec; /* Pink floor */
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* RPG Dialog Style */
+        #dialog-box {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 90px;
+            background: #fff;
+            border-top: 4px solid #333;
+            color: #000;
+            padding: 10px;
+            box-sizing: border-box;
+            font-size: 14px;
+            display: none; 
+            z-index: 10;
+        }
+
+        #dialog-text {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        #next-btn {
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            color: #e91e63;
+            font-weight: bold;
+            animation: blink 1s infinite;
+            display: none;
+            cursor: pointer;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* End Screen Overlay */
+        #end-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            color: #e91e63;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 20;
+        }
+
+        /* Mobile Controls */
+        #controls {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: 60px 60px 60px 80px;
+            grid-template-rows: 60px 60px;
+            gap: 5px;
+            user-select: none;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        .btn:active { background: rgba(255, 255, 255, 0.5); }
+        
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        
+        #btn-a {
+            grid-column: 4; 
+            grid-row: 2;
+            background-color: #ff4081;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            margin-top: -10px;
+            margin-left: 10px;
+            font-weight: bold;
+            font-size: 20px;
+            box-shadow: 0 4px 0 #c51162;
+        }
+        #btn-a:active { box-shadow: 0 0 0; transform: translateY(4px); }
+
+        .instructions { color: #aaa; font-size: 12px; margin-bottom: 5px; text-align: center; }
+
+    </style>
+</head>
+<body>
+
+    <div class="instructions">Use Arrows to Move • Press 'A' to Interact</div>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <canvas id="gameCanvas" width="320" height="320"></canvas>
+            
+            <div id="dialog-box">
+                <p id="dialog-text">Text goes here...</p>
+                <div id="next-btn">▼ NEXT</div>
+            </div>
+
+            <div id="end-screen">
+                <h1>SURPRISE!</h1>
+                <p>Khloe has a message:</p>
+                <h2 style="font-size: 28px; border: 2px dashed #e91e63; padding: 10px;">"I'M BIG SISTER"</h2>
+                <p>Congratulations!</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div class="btn" id="btn-left">←</div>
+        <div class="btn" id="btn-up">↑</div>
+        <div class="btn" id="btn-right">→</div>
+        <div class="btn" id="btn-down">↓</div>
+        <div class="btn" id="btn-a">A</div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const dialogBox = document.getElementById('dialog-box');
+    const dialogText = document.getElementById('dialog-text');
+    const nextBtn = document.getElementById('next-btn');
+    const endScreen = document.getElementById('end-screen');
+
+    // --- GAME CONFIG ---
+    const TILE = 32;
+    const player = { x: 5 * TILE, y: 5 * TILE, speed: 4, dir: 'down', color: '#ff4081' }; 
+    
+    // --- STORY STATE ---
+    // 0 = Needs to find Mirror ("I'M")
+    // 1 = Needs to find Bear ("BIG")
+    // 2 = Needs to find Gift ("SISTER")
+    let storyProgress = 0; 
+    let isTalking = false;
+
+    // Objects
+    // ID: Used for logic
+    // Symbol: The emoji drawn on the map
+    const objects = [
+        { id: 'mirror', x: 2, y: 2, w: 1, h: 1, color: '#81d4fa', symbol: '🪞' },
+        { id: 'bear',   x: 7, y: 3, w: 2, h: 2, color: '#795548', symbol: '🧸' }, // Bigger object
+        { id: 'gift',   x: 4, y: 7, w: 1, h: 1, color: '#ffd54f', symbol: '🎁' }
+    ];
+
+    let keys = {};
+
+    // --- INPUTS ---
+    window.addEventListener('keydown', (e) => {
+        keys[e.key] = true;
+        if (e.key === ' ' || e.key === 'Enter') interact();
+    });
+    window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    const addTouch = (elem, key) => {
+        elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+        elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+    };
+    addTouch(document.getElementById('btn-up'), 'ArrowUp');
+    addTouch(document.getElementById('btn-down'), 'ArrowDown');
+    addTouch(document.getElementById('btn-left'), 'ArrowLeft');
+    addTouch(document.getElementById('btn-right'), 'ArrowRight');
+    
+    document.getElementById('btn-a').addEventListener('touchstart', (e) => { 
+        e.preventDefault(); 
+        if(isTalking) closeDialog(); 
+        else interact(); 
+    });
+    dialogBox.addEventListener('click', closeDialog);
+
+    // --- ENGINE ---
+    function update() {
+        if (isTalking) return;
+
+        let dx = 0, dy = 0;
+        if (keys['ArrowUp'] || keys['w']) { dy = -player.speed; player.dir = 'up'; }
+        else if (keys['ArrowDown'] || keys['s']) { dy = player.speed; player.dir = 'down'; }
+        else if (keys['ArrowLeft'] || keys['a']) { dx = -player.speed; player.dir = 'left'; }
+        else if (keys['ArrowRight'] || keys['d']) { dx = player.speed; player.dir = 'right'; }
+
+        // Move & Collide with Walls
+        let nextX = player.x + dx;
+        let nextY = player.y + dy;
+
+        // Boundary checks
+        if (nextX < 0) nextX = 0;
+        if (nextX > canvas.width - TILE) nextX = canvas.width - TILE;
+        if (nextY < TILE) nextY = TILE; // Top wall
+        if (nextY > canvas.height - TILE) nextY = canvas.height - TILE;
+
+        player.x = nextX;
+        player.y = nextY;
+    }
+
+    function draw() {
+        // Floor
+        ctx.fillStyle = '#fce4ec'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Top Wall
+        ctx.fillStyle = '#c2185b'; 
+        ctx.fillRect(0, 0, canvas.width, TILE);
+
+        // Objects
+        objects.forEach(obj => {
+            ctx.fillStyle = obj.color;
+            ctx.fillRect(obj.x * TILE, obj.y * TILE, obj.w * TILE, obj.h * TILE);
+            
+            // Border
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(obj.x * TILE, obj.y * TILE, obj.w * TILE, obj.h * TILE);
+
+            // Emoji Icon
+            ctx.fillStyle = '#000';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            // Center the emoji
+            const cx = (obj.x * TILE) + (obj.w * TILE) / 2;
+            const cy = (obj.y * TILE) + (obj.h * TILE) / 1.5;
+            ctx.fillText(obj.symbol, cx, cy);
+        });
+
+        // Player (Khloe)
+        const px = player.x + 16;
+        const py = player.y + 16;
+        
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes based on direction
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        if(player.dir === 'left') {
+            ctx.arc(px - 6, py - 2, 2, 0, Math.PI*2);
+        } else if (player.dir === 'right') {
+            ctx.arc(px + 6, py - 2, 2, 0, Math.PI*2);
+        } else {
+            ctx.arc(px - 4, py - 2, 2, 0, Math.PI*2);
+            ctx.arc(px + 4, py - 2, 2, 0, Math.PI*2);
+        }
+        ctx.fill();
+
+        // Bow
+        ctx.fillStyle = '#ffeb3b';
+        ctx.fillRect(px - 4, py - 14, 8, 4);
+
+        requestAnimationFrame(loop);
+    }
+
+    function loop() {
+        update();
+        draw();
+    }
+
+    // --- INTERACTION LOGIC ---
+    function interact() {
+        if(isTalking) {
+            closeDialog();
+            return;
+        }
+
+        // Find closest object
+        const px = player.x + 16;
+        const py = player.y + 16;
+        let target = null;
+
+        objects.forEach(obj => {
+            const ox = (obj.x * TILE) + (obj.w * TILE) / 2;
+            const oy = (obj.y * TILE) + (obj.h * TILE) / 2;
+            // Distance check
+            if (Math.hypot(px - ox, py - oy) < 45) {
+                target = obj;
+            }
+        });
+
+        if (!target) return;
+
+        // SEQUENTIAL LOGIC
+        if (target.id === 'mirror') {
+            if (storyProgress === 0) {
+                showDialog("Khloe points at herself in the mirror. She says: 'I'M'");
+                storyProgress = 1;
+            } else {
+                showDialog("Khloe looks in the mirror. She is so cute!");
+            }
+        } 
+        else if (target.id === 'bear') {
+            if (storyProgress === 0) {
+                showDialog("Khloe wants to look in the Mirror first.");
+            } else if (storyProgress === 1) {
+                showDialog("Khloe hugs the Giant Bear. She says: 'BIG'");
+                storyProgress = 2;
+            } else {
+                showDialog("The bear is soft and fuzzy.");
+            }
+        }
+        else if (target.id === 'gift') {
+            if (storyProgress < 2) {
+                showDialog("Khloe shakes the box. She needs to find the other words first!");
+            } else if (storyProgress === 2) {
+                // THE REVEAL
+                isTalking = true;
+                dialogText.innerText = "Khloe opens the box. It's a baby onesie! Khloe shouts: 'SISTER'";
+                dialogBox.style.display = 'block';
+                // Override the close function for the final step
+                nextBtn.style.display = 'block';
+                dialogBox.onclick = finishGame;
+                document.getElementById('btn-a').onclick = finishGame;
+            }
+        }
+    }
+
+    function showDialog(text) {
+        isTalking = true;
+        dialogText.innerText = text;
+        dialogBox.style.display = 'block';
+        nextBtn.style.display = 'block';
+    }
+
+    function closeDialog() {
+        isTalking = false;
+        dialogBox.style.display = 'none';
+        nextBtn.style.display = 'none';
+    }
+
+    function finishGame() {
+        dialogBox.style.display = 'none';
+        endScreen.style.display = 'flex';
+    }
+
+    // Start
+    loop();
+    showDialog("Help Khloe talk! Find the Mirror, then the Bear, then the Gift.");
+
+</script>
+</body>
+</html>
