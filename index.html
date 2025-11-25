@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khloe's Secret</title>
+    <title>Game</title>
     <style>
         body {
             background-color: #202028;
@@ -59,6 +59,7 @@
         #dialog-text {
             margin: 0;
             line-height: 1.4;
+            font-weight: bold;
         }
 
         #next-btn {
@@ -78,7 +79,7 @@
         #end-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98);
             color: #e91e63;
             display: none;
             flex-direction: column;
@@ -86,6 +87,8 @@
             justify-content: center;
             text-align: center;
             z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         /* Mobile Controls */
@@ -138,7 +141,7 @@
 </head>
 <body>
 
-    <div class="instructions">Desktop: Use ARROW KEYS to Move • Press 'A' to Interact</div>
+    <div class="instructions">Desktop: ARROWS to Move • 'A' to Interact</div>
 
     <div id="game-wrapper">
         <div id="game-container">
@@ -150,10 +153,14 @@
             </div>
 
             <div id="end-screen">
-                <h1>SURPRISE!</h1>
-                <p>Khloe has a message:</p>
-                <h2 style="font-size: 28px; border: 2px dashed #e91e63; padding: 10px;">"I'M BIG SISTER"</h2>
-                <p>Congratulations!</p>
+                <h1 style="font-size: 32px; margin-bottom: 10px;">SURPRISE!</h1>
+                <p style="color: #333; margin-bottom: 20px;">Khloe puts the words together:</p>
+                
+                <div style="border: 3px dashed #e91e63; padding: 20px; border-radius: 10px; background: #fff0f6;">
+                    <h2 style="font-size: 28px; margin: 0;">"I'M BIG SISTER"</h2>
+                </div>
+                
+                <p style="margin-top: 30px; font-weight: bold;">Congratulations!</p>
             </div>
         </div>
     </div>
@@ -181,6 +188,7 @@
     // --- STORY STATE ---
     let storyProgress = 0; 
     let isTalking = false;
+    let gameReadyToFinish = false; // Flag for when game is won
 
     const objects = [
         { id: 'mirror', x: 2, y: 2, w: 1, h: 1, color: '#81d4fa', symbol: '🪞' },
@@ -197,7 +205,11 @@
         
         // INTERACTION: Only trigger on 'a' or 'A'
         if (e.key === 'a' || e.key === 'A') {
-            interact();
+            if (isTalking) {
+                closeDialog();
+            } else {
+                interact();
+            }
         }
     });
     
@@ -213,13 +225,15 @@
     addTouch(document.getElementById('btn-left'), 'ArrowLeft');
     addTouch(document.getElementById('btn-right'), 'ArrowRight');
     
-    document.getElementById('btn-a').addEventListener('touchstart', (e) => { 
+    // Mobile 'A' Button logic
+    const btnA = document.getElementById('btn-a');
+    btnA.addEventListener('touchstart', (e) => { 
         e.preventDefault(); 
         if(isTalking) closeDialog(); 
         else interact(); 
     });
     
-    // Click dialog to advance
+    // Click dialog to advance (Mouse/Touch)
     dialogBox.addEventListener('click', closeDialog);
 
     // --- ENGINE ---
@@ -228,7 +242,7 @@
 
         let dx = 0, dy = 0;
         
-        // MOVEMENT: STRICTLY ARROW KEYS ONLY
+        // MOVEMENT: STRICTLY ARROW KEYS
         if (keys['ArrowUp']) { 
             dy = -player.speed; 
             player.dir = 'up'; 
@@ -324,10 +338,7 @@
 
     // --- INTERACTION LOGIC ---
     function interact() {
-        if(isTalking) {
-            closeDialog();
-            return;
-        }
+        if(isTalking) return; // Wait for closeDialog if already open
 
         // Find closest object
         const px = player.x + 16;
@@ -348,34 +359,29 @@
         // SEQUENTIAL LOGIC
         if (target.id === 'mirror') {
             if (storyProgress === 0) {
-                showDialog("Khloe points at herself in the mirror. She says: 'I'M'");
+                showDialog("Khloe points at the mirror and says: 'I'M'");
                 storyProgress = 1;
             } else {
-                showDialog("Khloe looks in the mirror. She is so cute!");
+                showDialog("Khloe smiles at herself.");
             }
         } 
         else if (target.id === 'bear') {
             if (storyProgress === 0) {
-                showDialog("Khloe wants to look in the Mirror first.");
+                showDialog("Khloe ignores the bear. She wants to see the Mirror first.");
             } else if (storyProgress === 1) {
-                showDialog("Khloe hugs the Giant Bear. She says: 'BIG'");
+                showDialog("Khloe hugs the Giant Bear and says: 'BIG'");
                 storyProgress = 2;
             } else {
-                showDialog("The bear is soft and fuzzy.");
+                showDialog("The bear is giant and fuzzy.");
             }
         }
         else if (target.id === 'gift') {
             if (storyProgress < 2) {
-                showDialog("Khloe shakes the box. She needs to find the other words first!");
+                showDialog("It's a gift box. Khloe needs to say the other words first!");
             } else if (storyProgress === 2) {
-                // THE REVEAL
-                isTalking = true;
-                dialogText.innerText = "Khloe opens the box. It's a baby onesie! Khloe shouts: 'SISTER'";
-                dialogBox.style.display = 'block';
-                // Override the close function for the final step
-                nextBtn.style.display = 'block';
-                dialogBox.onclick = finishGame;
-                document.getElementById('btn-a').onclick = finishGame;
+                // THE FINAL REVEAL INTERACTION
+                showDialog("Khloe opens the box, holding up a onesie: 'SISTER'");
+                gameReadyToFinish = true;
             }
         }
     }
@@ -388,14 +394,16 @@
     }
 
     function closeDialog() {
+        // If we are ready to finish, show the end screen instead of just closing
+        if (gameReadyToFinish) {
+            dialogBox.style.display = 'none';
+            endScreen.style.display = 'flex'; // Triggers the overlay
+            return;
+        }
+
         isTalking = false;
         dialogBox.style.display = 'none';
         nextBtn.style.display = 'none';
-    }
-
-    function finishGame() {
-        dialogBox.style.display = 'none';
-        endScreen.style.display = 'flex';
     }
 
     // Start
